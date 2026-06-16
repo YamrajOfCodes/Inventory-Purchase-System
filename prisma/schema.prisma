@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum POStatus {
+  DRAFT
+  PLACED
+  RECEIVED
+  CANCELLED
+}
+
+model Product {
+  id            String @id @default(cuid())
+  name          String
+  sku           String @unique
+
+  stockOnHand   Int @default(0)
+  reorderLevel  Int
+
+  supplierProducts  SupplierProduct[]
+  purchaseOrderItems PurchaseOrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Supplier {
+  id   String @id @default(cuid())
+  name String
+
+  supplierProducts SupplierProduct[]
+  purchaseOrders   PurchaseOrder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SupplierProduct {
+  supplierId String
+  productId  String
+
+  currentPriceMinor Int
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([supplierId, productId])
+}
+
+model PurchaseOrder {
+  id String @id @default(cuid())
+
+  supplierId String
+
+  status POStatus @default(DRAFT)
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  items PurchaseOrderItem[]
+
+  receivedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PurchaseOrderItem {
+  id String @id @default(cuid())
+
+  purchaseOrderId String
+  productId String
+
+  quantity Int
+
+  unitPriceMinor Int
+
+  totalMinor Int
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  product Product @relation(fields: [productId], references: [id])
+
+  createdAt DateTime @default(now())
+}
