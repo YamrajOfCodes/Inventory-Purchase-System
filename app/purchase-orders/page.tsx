@@ -4,6 +4,17 @@ import { useEffect, useState } from "react";
 import { Plus, X, ChevronDown, Send, XCircle, PackageCheck } from "lucide-react";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 
+import { useProducts } from "@/features/products/product.hooks";
+import { useSuppliers } from "@/features/suppliers/supplier.hooks";
+
+import {
+  usePurchaseOrders,
+  useCreatePurchaseOrder,
+  usePlacePurchaseOrder,
+  useCancelPurchaseOrder,
+  useReceivePurchaseOrder,
+} from "@/features/purchase-order/purchase-order.hooks";
+
 type Supplier = {
   id: string;
   name: string;
@@ -99,39 +110,39 @@ function PurchaseOrderActions({
 }
 
 export default function PurchaseOrdersPage() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
 
   const [supplierId, setSupplierId] = useState("");
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState(1);
 
-  const [isLoading, setIsLoading] = useState(true);
+
+  const { data: suppliers = [] } =
+  useSuppliers();
+
+const { data: products = [] } =
+  useProducts();
+
+const {
+  data: purchaseOrders = [],
+  isLoading,
+} = usePurchaseOrders();
+
+const createMutation =
+  useCreatePurchaseOrder();
+
+const placeMutation =
+  usePlacePurchaseOrder();
+
+const cancelMutation =
+  useCancelPurchaseOrder();
+
+const receiveMutation =
+  useReceivePurchaseOrder();
+
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  async function loadData() {
-    setIsLoading(true);
-
-    const suppliersRes = await fetch("/api/suppliers");
-    const suppliersData = await suppliersRes.json();
-
-    const productsRes = await fetch("/api/products");
-    const productsData = await productsRes.json();
-
-    const poRes = await fetch("/api/purchase-orders");
-    const poData = await poRes.json();
-
-    setSuppliers(suppliersData);
-    setProducts(productsData);
-    setPurchaseOrders(poData);
-    setIsLoading(false);
-  }
-
-  useEffect(() => {
-    loadData();
-  }, []);
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -144,60 +155,44 @@ export default function PurchaseOrdersPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isModalOpen]);
 
-  async function createPO() {
-    if (!supplierId || !productId) return;
+ async function createPO() {
+  if (!supplierId || !productId)
+    return;
 
+  try {
     setIsSubmitting(true);
 
-    await fetch("/api/purchase-orders", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        supplierId,
-        items: [
-          {
-            productId,
-            quantity: Number(quantity),
-          },
-        ],
-      }),
+    await createMutation.mutateAsync({
+      supplierId,
+      items: [
+        {
+          productId,
+          quantity,
+        },
+      ],
     });
 
     setSupplierId("");
     setProductId("");
     setQuantity(1);
-    setIsSubmitting(false);
+
     setIsModalOpen(false);
-
-    loadData();
+  } finally {
+    setIsSubmitting(false);
   }
+}
 
-  async function placePO(id: string) {
-    await fetch(`/api/purchase-orders/${id}/place`, {
-      method: "POST",
-    });
+async function placePO(id: string) {
+  await placeMutation.mutateAsync(id);
+}
 
-    loadData();
-  }
+async function cancelPO(id: string) {
+  await cancelMutation.mutateAsync(id);
+}
 
-  async function cancelPO(id: string) {
-    await fetch(`/api/purchase-orders/${id}/cancel`, {
-      method: "POST",
-    });
-
-    loadData();
-  }
-
-  async function receivePO(id: string) {
-    await fetch(`/api/purchase-orders/${id}/receive`, {
-      method: "POST",
-    });
-
-    loadData();
-  }
-
+ async function receivePO(id: string) {
+  await receiveMutation.mutateAsync(id);
+}
   const columns: DataTableColumn<PurchaseOrder>[] = [
     {
       key: "supplier",
@@ -291,7 +286,7 @@ export default function PurchaseOrdersPage() {
                     className="w-full appearance-none rounded-md border border-[#E8E6E1] px-3 py-2 pr-9 text-sm text-[#15171A] outline-none focus:border-[#1F2A44] focus:ring-1 focus:ring-[#1F2A44]"
                   >
                     <option value="">Select supplier</option>
-                    {suppliers.map((supplier) => (
+                    {suppliers.map((supplier:any) => (
                       <option key={supplier.id} value={supplier.id}>
                         {supplier.name}
                       </option>
@@ -312,7 +307,7 @@ export default function PurchaseOrdersPage() {
                     className="w-full appearance-none rounded-md border border-[#E8E6E1] px-3 py-2 pr-9 text-sm text-[#15171A] outline-none focus:border-[#1F2A44] focus:ring-1 focus:ring-[#1F2A44]"
                   >
                     <option value="">Select product</option>
-                    {products.map((product) => (
+                    {products.map((product:any) => (
                       <option key={product.id} value={product.id}>
                         {product.name}
                       </option>

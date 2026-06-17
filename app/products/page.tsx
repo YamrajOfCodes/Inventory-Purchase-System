@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import {
+  useProducts,
+  useCreateProduct,
+} from "@/features/products/product.hooks";
+
 
 type Product = {
   id: string;
@@ -13,49 +18,38 @@ type Product = {
 };
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
   const [reorderLevel, setReorderLevel] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function loadProducts() {
-    setIsLoading(true);
-    const res = await fetch("/api/products");
-    const data = await res.json();
-    setProducts(data);
-    setIsLoading(false);
-  }
+const {
+  data: products = [],
+  isLoading,
+} = useProducts();
 
-  async function createProduct() {
-    if (!name.trim() || !sku.trim()) return;
+const createMutation = useCreateProduct();
 
+
+ async function createProduct() {
+  if (!name.trim() || !sku.trim()) return;
+
+  try {
     setIsSubmitting(true);
 
-    await fetch("/api/products", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name,
-        sku,
-        reorderLevel: Number(reorderLevel),
-      }),
+    await createMutation.mutateAsync({
+      name,
+      sku,
+      reorderLevel,
     });
 
     setName("");
     setSku("");
     setReorderLevel(1);
+  } finally {
     setIsSubmitting(false);
-
-    loadProducts();
   }
-
-  useEffect(() => {
-    loadProducts();
-  }, []);
+}
 
   const columns: DataTableColumn<Product>[] = [
     {
