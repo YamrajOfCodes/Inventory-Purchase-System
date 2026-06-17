@@ -8,6 +8,7 @@ export async function GET() {
   return NextResponse.json(products);
 }
 
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();

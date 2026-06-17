@@ -3,6 +3,10 @@ import { POStatus } from "@prisma/client";
 
 import { AppError } from "@/shared/errors/app-error";
 import { CreatePurchaseOrderInput } from "@/shared/validators/purchase-order.validator";
+import {
+  acquireLock,
+  releaseLock,
+} from "@/lib/redis-lock";
 
 import { assertTransition } from "./purchase-order.state-machine";
 
@@ -142,61 +146,69 @@ export const purchaseOrderService = {
 },
 
 async receive(id: string) {
-  return prisma.$transaction(
-    async (tx) => {
-      const purchaseOrder =
-        await tx.purchaseOrder.findUnique({
-          where: {
-            id,
-          },
+  const lockKey = `po:${id}:receive`;
 
-          include: {
-            items: true,
-          },
-        });
+  const lock =
+    await acquireLock(lockKey);
 
-      if (!purchaseOrder) {
-        throw new AppError(
-          404,
-          "Purchase order not found"
-        );
-      }
+  if (!lock) {
+    throw new AppError(
+      409,
+      "Purchase order is already being processed"
+    );
+  }
 
-      assertTransition(
-        purchaseOrder.status,
-        POStatus.RECEIVED
-      );
-
-      for (const item of purchaseOrder.items) {
-        await tx.product.update({
-          where: {
-            id: item.productId,
-          },
-
-          data: {
-            stockOnHand: {
-              increment:
-                item.quantity,
+  try {
+    return await prisma.$transaction(
+      async (tx) => {
+        const purchaseOrder =
+          await tx.purchaseOrder.findUnique({
+            where: { id },
+            include: {
+              items: true,
             },
+          });
+
+        if (!purchaseOrder) {
+          throw new AppError(
+            404,
+            "Purchase order not found"
+          );
+        }
+
+        assertTransition(
+          purchaseOrder.status,
+          POStatus.RECEIVED
+        );
+
+        for (const item of purchaseOrder.items) {
+          await tx.product.update({
+            where: {
+              id: item.productId,
+            },
+            data: {
+              stockOnHand: {
+                increment:
+                  item.quantity,
+              },
+            },
+          });
+        }
+
+        return tx.purchaseOrder.update({
+          where: { id },
+          data: {
+            status:
+              POStatus.RECEIVED,
+            receivedAt:
+              new Date(),
           },
         });
       }
-
-      return tx.purchaseOrder.update({
-        where: {
-          id,
-        },
-
-        data: {
-          status:
-            POStatus.RECEIVED,
-
-          receivedAt:
-            new Date(),
-        },
-      });
-    }
-  );
+    );
+  } finally {
+    await releaseLock(lockKey);
+  }
 }
 
 

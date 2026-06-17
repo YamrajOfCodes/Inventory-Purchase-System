@@ -19,4 +19,15 @@ export const productService = {
       },
     });
   },
+
+    async getLowStockProducts() {
+    const products =
+      await prisma.product.findMany();
+
+    return products.filter(
+      (product) =>
+        product.stockOnHand <
+        product.reorderLevel
+    );
+  },
 };
