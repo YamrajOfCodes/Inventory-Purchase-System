@@ -87,3 +87,16 @@ model PurchaseOrderItem {
 
   createdAt DateTime @default(now())
 }
+
+model PurchaseOrder {
+  id         String   @id @default(cuid())
+
+  status     POStatus
+
+  receivedAt DateTime?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  ...
+}

@@ -3,12 +3,27 @@ import { purchaseOrderService } from "@/domain/purchaseOrder/purchase-order.serv
 import { createPurchaseOrderSchema } from "@/shared/validators/purchase-order.validator";
 
 export async function GET() {
-  const purchaseOrders =
-    await purchaseOrderService.getAll();
+  try {
+    const purchaseOrders =
+      await purchaseOrderService.getAll();
 
-  return NextResponse.json(purchaseOrders);
+    return NextResponse.json(purchaseOrders);
+  } catch (error) {
+    console.error("GET PURCHASE ORDERS ERROR:", error);
+
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unknown error",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
 }
-
 export async function POST(req: Request) {
   try {
     const body = await req.json();
