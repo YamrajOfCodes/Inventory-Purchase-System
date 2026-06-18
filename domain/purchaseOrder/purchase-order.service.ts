@@ -11,18 +11,23 @@ import {
 import { assertTransition } from "./purchase-order.state-machine";
 
 export const purchaseOrderService = {
-  async getAll() {
-    return prisma.purchaseOrder.findMany({
-      include: {
-        supplier: true,
-        items: true,
-      },
+async getAll() {
+  return prisma.purchaseOrder.findMany({
+    include: {
+      supplier: true,
 
-      orderBy: {
-        createdAt: "desc",
+      items: {
+        include: {
+          product: true,
+        },
       },
-    });
-  },
+    },
+
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+},
 
   async createDraft(
     data: CreatePurchaseOrderInput

@@ -20,6 +20,14 @@ export const productService = {
     });
   },
 
+   async delete(id: string) {
+    return prisma.product.delete({
+      where: {
+        id,
+      },
+    })
+  },
+
     async getLowStockProducts() {
     const products =
       await prisma.product.findMany();

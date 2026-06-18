@@ -7,6 +7,7 @@ import {
   useProducts,
   useCreateProduct,
 } from "@/features/products/product.hooks";
+import Loader from "@/components/ui/Loader";
 
 
 type Product = {
@@ -22,34 +23,57 @@ export default function ProductsPage() {
   const [sku, setSku] = useState("");
   const [reorderLevel, setReorderLevel] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loader,setLoader] = useState(false);
 
-const {
-  data: products = [],
-  isLoading,
-} = useProducts();
+  const {
+    data: products = [],
+    isLoading,
+  } = useProducts();
 
-const createMutation = useCreateProduct();
+  const createMutation = useCreateProduct();
 
 
- async function createProduct() {
-  if (!name.trim() || !sku.trim()) return;
 
-  try {
-    setIsSubmitting(true);
+  const [search, setSearch] = useState("");
 
-    await createMutation.mutateAsync({
-      name,
-      sku,
-      reorderLevel,
-    });
+  const filteredProducts = products.filter(
+    (product: any) =>
+      product.name
+        .toLowerCase()
+        .includes(search.toLowerCase()) ||
+      product.sku
+        .toLowerCase()
+        .includes(search.toLowerCase())
+  );
 
-    setName("");
-    setSku("");
-    setReorderLevel(1);
-  } finally {
-    setIsSubmitting(false);
+
+  async function createProduct() {
+    if (!name.trim() || !sku.trim()) return;
+    setLoader(true);
+
+    try {
+      setIsSubmitting(true);
+
+      await createMutation.mutateAsync({
+        name,
+        sku,
+        reorderLevel,
+      },{
+         onSuccess:()=>{
+          setLoader(false)
+        },
+        onError:()=>{
+          setLoader(false);
+        }
+      });
+
+      setName("");
+      setSku("");
+      setReorderLevel(1);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
-}
 
   const columns: DataTableColumn<Product>[] = [
     {
@@ -79,8 +103,8 @@ const createMutation = useCreateProduct();
           </span>
         ) : (
           product.reorderLevel
-        ),
-    },
+    ),
+  },
   ];
 
   return (
@@ -96,6 +120,17 @@ const createMutation = useCreateProduct();
           <p className="mt-2 text-base text-[#6B6F76]">
             Manage your catalog, pricing, and reorder thresholds.
           </p>
+
+          
+          <input
+            type="text"
+            placeholder="Search by name or SKU..."
+            value={search}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
+            className="mb-4 w-full rounded-md border px-3 py-2 mt-5"
+          />
         </header>
 
         <div className="mb-8 rounded-lg border border-[#E8E6E1] bg-white p-6">
@@ -152,7 +187,7 @@ const createMutation = useCreateProduct();
 
         <DataTable
           columns={columns}
-          data={products}
+          data={filteredProducts}
           rowKey={(product) => product.id}
           isLoading={isLoading}
           emptyTitle="No products yet"

@@ -14,6 +14,8 @@ import {
   useCancelPurchaseOrder,
   useReceivePurchaseOrder,
 } from "@/features/purchase-order/purchase-order.hooks";
+import PurchaseModal from "@/components/ui/PurchaseModal";
+import Loader from "@/components/ui/Loader";
 
 type Supplier = {
   id: string;
@@ -33,9 +35,19 @@ type PurchaseOrderItemForm = {
 type PurchaseOrder = {
   id: string;
   status: string;
+
   supplier: {
     name: string;
   };
+
+  items: {
+    quantity: number;
+    totalMinor: number;
+
+    product: {
+      name: string;
+    };
+  }[];
 };
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
@@ -153,6 +165,16 @@ export default function PurchaseOrdersPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [loader,setLoader] = useState(false);
+
+  const filteredOrders =
+    statusFilter === "ALL"
+      ? purchaseOrders
+      : purchaseOrders.filter(
+        (po: any) =>
+          po.status === statusFilter
+      );
 
 
   function addItem() {
@@ -201,6 +223,8 @@ export default function PurchaseOrdersPage() {
   }, [isModalOpen]);
 
   const createPO = async () => {
+    setLoader(true);
+    console.log("hi")
     if (!supplierId) return;
 
     const validItems = items.filter(
@@ -218,6 +242,13 @@ export default function PurchaseOrdersPage() {
       await createMutation.mutateAsync({
         supplierId,
         items: validItems,
+      },{
+        onSuccess:()=>{
+          setLoader(false)
+        },
+        onError:()=>{
+          setLoader(false);
+        }
       });
 
       setSupplierId("");
@@ -234,16 +265,41 @@ export default function PurchaseOrdersPage() {
       setIsSubmitting(false);
     }
   }
+
   async function placePO(id: string) {
-    await placeMutation.mutateAsync(id);
+     setLoader(true);
+    await placeMutation.mutateAsync(id,{
+       onSuccess:()=>{
+          setLoader(false)
+        },
+        onError:()=>{
+          setLoader(false);
+        }
+    });
   }
 
   async function cancelPO(id: string) {
-    await cancelMutation.mutateAsync(id);
+    setLoader(true)
+    await cancelMutation.mutateAsync(id,{
+       onSuccess:()=>{
+          setLoader(false)
+        },
+        onError:()=>{
+          setLoader(false);
+        }
+    });
   }
 
   async function receivePO(id: string) {
-    await receiveMutation.mutateAsync(id);
+    setLoader(true)
+    await receiveMutation.mutateAsync(id,{
+       onSuccess:()=>{
+          setLoader(false)
+        },
+        onError:()=>{
+          setLoader(false);
+        }
+    });
   }
   const columns: DataTableColumn<PurchaseOrder>[] = [
     {
@@ -264,7 +320,47 @@ export default function PurchaseOrdersPage() {
         <PurchaseOrderActions po={po} onPlace={placePO} onCancel={cancelPO} onReceive={receivePO} />
       ),
     },
+    {
+      key: "items",
+      header: "Items",
+
+      render: (po) => (
+        <div className="space-y-1">
+          {po.items?.map((item, index) => (
+            <div key={index}>
+              {item.product.name} × {item.quantity}
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      key: "total",
+      header: "Total",
+      align: "right",
+
+      render: (po) => {
+        const total =
+          po.items?.reduce(
+            (sum, item) =>
+              sum + item.totalMinor,
+            0
+          ) ?? 0;
+
+        return (
+          <span className="font-medium">
+            ₹{(total / 100).toFixed(2)}
+          </span>
+        );
+      },
+    },
   ];
+
+  if(loader){
+    return (
+      <Loader/>
+    )
+  }
 
   return (
     <main className="min-h-screen bg-[#F7F7F5]">
@@ -282,6 +378,26 @@ export default function PurchaseOrdersPage() {
             </p>
           </div>
 
+
+        <div className="space-x-5 space-y-5">
+            <select
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(e.target.value)
+            }
+            className="rounded-md border px-3 py-2"
+          >
+            <option value="ALL">All</option>
+            <option value="DRAFT">Draft</option>
+            <option value="PLACED">Placed</option>
+            <option value="RECEIVED">
+              Received
+            </option>
+            <option value="CANCELLED">
+              Cancelled
+            </option>
+          </select>
+
           <button
             onClick={() => setIsModalOpen(true)}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#1F2A44] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#162033]"
@@ -289,11 +405,12 @@ export default function PurchaseOrdersPage() {
             <Plus className="h-4 w-4" strokeWidth={2} />
             New purchase order
           </button>
+        </div>
         </header>
 
         <DataTable
           columns={columns}
-          data={purchaseOrders}
+          data={filteredOrders}
           rowKey={(po) => po.id}
           isLoading={isLoading}
           emptyTitle="No purchase orders yet"
@@ -302,160 +419,19 @@ export default function PurchaseOrdersPage() {
       </div>
 
       {isModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[#15171A]/40 p-4"
-          onClick={() => setIsModalOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="create-po-title"
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-lg border border-[#E8E6E1] bg-white p-6 shadow-lg"
-          >
-            <div className="mb-5 flex items-center justify-between">
-              <h2 id="create-po-title" className="text-base font-medium text-[#15171A]">
-                New purchase order
-              </h2>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                aria-label="Close"
-                className="rounded-md p-1 text-[#6B6F76] transition-colors hover:bg-[#FAFAF9] hover:text-[#15171A]"
-              >
-                <X className="h-4 w-4" strokeWidth={2} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[#6B6F76]">
-                  Supplier
-                </label>
-                <div className="relative">
-                  <select
-                    value={supplierId}
-                    onChange={(e) => setSupplierId(e.target.value)}
-                    className="w-full appearance-none rounded-md border border-[#E8E6E1] px-3 py-2 pr-9 text-sm text-[#15171A] outline-none focus:border-[#1F2A44] focus:ring-1 focus:ring-[#1F2A44]"
-                  >
-                    <option value="">Select supplier</option>
-                    {suppliers.map((supplier: any) => (
-                      <option key={supplier.id} value={supplier.id}>
-                        {supplier.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B6F76]" />
-                </div>
-              </div>
-
-              <div>
-                <div>
-                  <div className="mb-2 flex items-center justify-between">
-                    <label className="text-xs font-medium text-[#6B6F76]">
-                      Items
-                    </label>
-
-                    <button
-                      type="button"
-                      onClick={addItem}
-                      className="text-sm font-medium text-[#1F2A44]"
-                    >
-                      + Add Item
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    {items.map((item, index) => (
-                      <div
-                        key={index}
-                        className="grid grid-cols-[2fr_1fr_auto] gap-3"
-                      >
-                        <div className="relative">
-                          <select
-                            value={item.productId}
-                            onChange={(e) =>
-                              updateItem(
-                                index,
-                                "productId",
-                                e.target.value
-                              )
-                            }
-                            className="w-full appearance-none rounded-md border border-[#E8E6E1] px-3 py-2 pr-9 text-sm"
-                          >
-                            <option value="">
-                              Select product
-                            </option>
-
-                            {products.map(
-                              (product: any) => (
-                                <option
-                                  key={product.id}
-                                  value={product.id}
-                                >
-                                  {product.name}
-                                </option>
-                              )
-                            )}
-                          </select>
-
-                          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B6F76]" />
-                        </div>
-
-                        <input
-                          type="number"
-                          min={1}
-                          value={item.quantity}
-                          onChange={(e) =>
-                            updateItem(
-                              index,
-                              "quantity",
-                              Number(
-                                e.target.value
-                              )
-                            )
-                          }
-                          className="rounded-md border border-[#E8E6E1] px-3 py-2 text-sm"
-                        />
-
-                        {items.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              removeItem(index)
-                            }
-                            className="rounded-md border px-3 py-2 text-sm text-red-600"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="rounded-md px-4 py-2 text-sm font-medium text-[#6B6F76] transition-colors hover:bg-[#FAFAF9]"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={createPO}
-                disabled={
-                  isSubmitting ||
-                  !supplierId
-                }
-                className="inline-flex items-center justify-center rounded-md bg-[#1F2A44] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#162033] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isSubmitting ? "Creating..." : "Create draft"}
-              </button>
-            </div>
-          </div>
-        </div>
+       <PurchaseModal
+       addItem={addItem}
+       items={items}
+       products={products}
+       removeItem={removeItem}
+       setIsModalOpen={setIsModalOpen}
+       supplierId={supplierId}
+       suppliers={suppliers}
+       updateItem={updateItem}
+       isSubmitting={isSubmitting}
+      setSupplierId={setSupplierId}
+      createPO={createPO}
+       />
       )}
     </main>
   );

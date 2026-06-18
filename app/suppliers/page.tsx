@@ -16,30 +16,39 @@ type Supplier = {
 export default function SuppliersPage() {
   const [name, setName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const {
-  data: suppliers = [],
-  isLoading,
-} = useSuppliers();
+    data: suppliers = [],
+    isLoading,
+  } = useSuppliers();
 
-const createMutation = useCreateSupplier();
+  const createMutation = useCreateSupplier();
+
+  const [search, setSearch] = useState("");
+
+  const filteredSuppliers =
+    suppliers.filter((supplier: any) =>
+      supplier.name
+        .toLowerCase()
+        .includes(search.toLowerCase())
+    );
 
 
- const createSupplier = async() => {
-  if (!name.trim()) return;
+  const createSupplier = async () => {
+    if (!name.trim()) return;
 
-  try {
-    setIsSubmitting(true);
+    try {
+      setIsSubmitting(true);
 
-    await createMutation.mutateAsync({
-      name,
-    });
+      await createMutation.mutateAsync({
+        name,
+      });
 
-    setName("");
-  } finally {
-    setIsSubmitting(false);
+      setName("");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
-}
 
 
 
@@ -64,6 +73,16 @@ const createMutation = useCreateSupplier();
           <p className="mt-2 text-base text-[#6B6F76]">
             Keep vendor details and contacts up to date.
           </p>
+
+          <input
+            type="text"
+            placeholder="Search supplier."
+            value={search}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
+            className="mb-4 w-full rounded-md border px-3 py-2 mt-5"
+          />
         </header>
 
         <div className="mb-8 rounded-lg border border-[#E8E6E1] bg-white p-6">
@@ -98,7 +117,7 @@ const createMutation = useCreateSupplier();
 
         <DataTable
           columns={columns}
-          data={suppliers}
+          data={filteredSuppliers}
           rowKey={(supplier) => supplier.id}
           isLoading={isLoading}
           emptyTitle="No suppliers yet"
